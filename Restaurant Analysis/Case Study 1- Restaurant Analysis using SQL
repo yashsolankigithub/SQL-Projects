@@ -1,0 +1,328 @@
+CREATE DATABASE dannys;
+CREATE SCHEMA dannys_diner;
+
+CREATE TABLE dannys_diner.sales(
+customer_id varchar (5),
+order_date date,
+product_id int);
+
+ALTER TABLE dannys_diner.sales
+ADD PRIMARY KEY (customer_id,product_id);
+
+CREATE TABLE dannys_diner.menu(
+product_id int,
+product_name Varchar (30),
+price int);
+
+
+CREATE TABLE dannys_diner.members(
+join_date date,
+customer_id varchar (5));
+
+insert into dannys_diner.sales(customer_id,order_date,product_id) values 
+('A','2021-01-01',1),
+('A','2021-01-01',2),
+('A','2021-01-07',2),
+('A','2021-01-10',3),
+('A','2021-01-11',3),
+('A','2021-01-11',3),
+('B','2021-01-01',2),
+('B','2021-01-02',2),
+('B','2021-01-04',1),
+('B','2021-01-11',1),
+('B','2021-01-16',3),
+('B','2021-02-01',3),
+('C','2021-01-01',3),
+('C','2021-01-01',3),
+('C','2021-01-07',3);
+
+INSERT INTO dannys_diner.menu (product_id,product_name,price) 
+VALUES 
+(1,"sushi",10),
+(2,"curry",15),
+(3,"ramen",12);
+
+
+INSERT INTO dannys_diner.members (join_date,customer_id) 
+VALUES
+('2021-01-07','A'),
+('2021-01-09','B');
+
+
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members;
+
+/* Each of the following case study questions can be answered using a single SQL statement:
+1. What is the total amount each customer spent at the restaurant?
+2. How many days has each customer visited the restaurant?
+3. What was the first item from the menu purchased by each customer?
+4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+5. Which item was the most popular for each customer?
+6. Which item was purchased first by the customer after they became a member?
+7. Which item was purchased just before the customer became a member?
+8. What is the total items and amount spent for each member before they became a member?
+9. If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+10. In the first week after a customer joins the program (including their join date) 
+they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+*/
+
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members;
+
+
+## 1. What is the total amount each customer spent at the restaurant?
+
+SELECT sales.*,menu.* FROM dannys_diner.sales as sales
+JOIN dannys_diner.menu as menu
+ON sales.product_id = menu.product_id;
+
+SELECT sales1.customer_id,SUM(menu1.price) FROM dannys_diner.sales AS sales1
+JOIN dannys_diner.menu AS menu1
+ON sales1.product_id = menu1.product_id
+GROUP BY sales1.customer_id;
+
+/*Customer A spent 76
+Customer B spent 74 
+Customer C spent 36 
+So Customer A spent highest amount that is 76.
+*/
+
+/*
+2. How many days has each customer visited the restaurant?
+*/
+
+SELECT customer_id,COUNT(DISTINCT order_date)  AS no_of_days FROM dannys_diner.sales
+GROUP BY customer_id;
+
+/*Customer A no_of_days visited 4
+Customer B no_of_days visited 6
+Customer C no_of_days visited 2
+So Customer B highest no_of_days visited that is 6.
+*/
+
+
+/*
+3. What was the first item from the menu purchased by each customer?
+*/
+
+with final as (
+SELECT sales1.*,menu1.product_name,
+rank() over (partition by customer_id order by order_date) AS ranking 
+FROM dannys_diner.sales AS sales1
+JOIN dannys_diner.menu AS menu1
+ON sales1.product_id = menu1.product_id)
+SELECT * FROM final
+where ranking = 1 ;
+
+with final as (
+SELECT sales1.*,menu1.product_name,
+row_number() over (partition by customer_id order by order_date) AS row_num,
+rank() over (partition by customer_id order by order_date) AS ranking,
+dense_rank() over (partition by customer_id order by order_date) AS dense_ranking
+FROM dannys_diner.sales AS sales1
+JOIN dannys_diner.menu AS menu1
+ON sales1.product_id = menu1.product_id)
+SELECT * FROM final
+where row_num = 1 ;
+
+/*
+4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+*/
+
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members;
+
+
+
+SELECT count(*),menu1.product_name FROM dannys_diner.sales AS sales1
+JOIN dannys_diner.menu AS menu1
+ON sales1.product_id = menu1.product_id
+GROUP BY menu1.product_name;
+
+/*
+ most purchased item on the menu is ramen & 8 times was it purchased by all customers.
+*/
+
+
+
+/*
+5. Which item was the most popular for each customer?
+*/
+
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members;
+
+with final as (
+SELECT sales1.customer_id,menu1.product_name,count(*) AS total
+FROM dannys_diner.sales sales1
+JOIN dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id
+group by sales1.customer_id,menu1.product_name)
+
+SELECT customer_id,product_name,total,
+rank() over (partition by customer_id order by total desc) as ranking 
+from final;
+
+/*For Customer A ramen 3 times
+Customer B curry , sushi & ramen 2 times
+Customer C ramen 3 times
+*/
+
+
+/*
+6. Which item was purchased first by the customer after they became a member?
+*/
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members;
+
+SELECT * FROM dannys_diner.members menbers1
+JOIN   
+(SELECT * FROM dannys_diner.sales sales1
+JOIN dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id)
+ON menbers1.customer_id = sales1.customer_id;
+
+
+with final as (
+SELECT sales1.*,members1.customer_id as CUSTOMERID,members1.join_date,
+rank() over (partition by sales1.customer_id order by order_date) as ranking,
+menu1.product_name
+FROM dannys_diner.sales sales1
+left join dannys_diner.members members1
+ON sales1.customer_id = members1.customer_id
+join dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id
+where sales1.order_date>= members1.join_date
+)
+SELECT customer_id,ranking,product_name from final where ranking = 1;
+
+/*
+7. Which item was purchased just before the customer became a member?
+*/
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members; 
+
+with final as (
+SELECT sales1.*,members1.customer_id as CUSTOMERID,members1.join_date,
+rank() over (partition by sales1.customer_id order by order_date) as ranking,
+menu1.product_name
+FROM dannys_diner.sales sales1
+left join dannys_diner.members members1
+ON sales1.customer_id = members1.customer_id
+join dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id
+where sales1.order_date < members1.join_date
+)
+SELECT * from final where ranking = 1;
+
+/*
+8. What is the total items and amount spent for each member before they became a member?
+*/
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members; 
+
+with MEMBERSDATA as (
+SELECT sales1.customer_id,sales1.order_date,members1.join_date,menu1.price,menu1.product_name
+ FROM dannys_diner.sales sales1
+ left join dannys_diner.members members1
+ ON sales1.customer_id = members1.customer_id
+join dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id
+where sales1.order_date < members1.join_date
+)
+SELECT customer_id,sum(price),count(distinct product_name) from MEMBERSDATA
+group by customer_id;
+
+/*
+9. If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+*/
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members; 
+
+with points as (
+SELECT sales1.customer_id,sales1.order_date,menu1.product_name,menu1.price,
+CASE WHEN product_name  = 'sushi' then 2*menu1.price
+ELSE menu1.price end as newprice
+ FROM dannys_diner.sales sales1
+join dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id
+)
+SELECT customer_id,sum(newprice)*10 from points
+group by customer_id;
+
+
+/*
+10. In the first week after a customer joins the program (including their join date) 
+they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+*/
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members; 
+
+with finalpoints as (
+SELECT sales1.customer_id,sales1.order_date,menu1.product_name,menu1.price,
+CASE WHEN product_name  = 'sushi' then 2*menu1.price
+WHEN sales1.order_date between members1.join_date and (members1.join_date+ interval 6 day) then 2*price
+ELSE menu1.price end as newprice
+ FROM dannys_diner.sales sales1
+join dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id
+join dannys_diner.members members1
+ON sales1.customer_id = members1.customer_id
+where sales1.order_date <= '2021-01-31'
+)
+SELECT customer_id,sum(newprice)*10 from finalpoints
+group by customer_id;
+
+
+/*
+Bonus Questions
+11. Join All The Things :- Recreate the following table output using the available data:
+*/
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members;
+
+
+SELECT sales1.customer_id,sales1.order_date,menu1.product_name,menu1.price,
+case when sales1.order_date < members1.join_date then 'N' 
+when members1.join_date is null then 'N'
+else 'Y' end as MEMBERS
+FROM dannys_diner.sales sales1
+join dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id
+left join dannys_diner.members members1
+ON sales1.customer_id = members1.customer_id;
+
+/*
+Bonus Questions
+12. Rank All The Things :- Recreate the following table output using the available data:
+*/
+SELECT * FROM dannys_diner.sales;
+SELECT * FROM dannys_diner.menu;
+SELECT * FROM dannys_diner.members;
+
+with ranking as (
+SELECT sales1.customer_id,sales1.order_date,menu1.product_name,menu1.price,
+case when sales1.order_date < members1.join_date then 'N' 
+when members1.join_date is null then 'N'
+else 'Y' end as MEMBERS
+FROM dannys_diner.sales sales1
+join dannys_diner.menu menu1
+ON sales1.product_id = menu1.product_id
+left join dannys_diner.members members1
+ON sales1.customer_id = members1.customer_id
+)
+SELECT *,
+case when MEMBERS = 'N' then null
+else
+rank() over (partition by customer_id,MEMBERS order by order_date) end as rankcalc
+ from ranking; 
